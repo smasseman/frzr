@@ -8,10 +8,7 @@ import io.ktor.websocket.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.newFixedThreadPoolContext
 import org.slf4j.LoggerFactory
-import se.smasseman.frzr.Temperature
-import se.smasseman.frzr.Thermometer
-import se.smasseman.frzr.Wanted
-import se.smasseman.frzr.WantedValue
+import se.smasseman.frzr.*
 import java.text.DecimalFormat
 import java.time.Duration
 import java.time.ZoneId
@@ -19,8 +16,9 @@ import java.util.*
 
 fun Application.configureSockets(
     thermometer: Thermometer,
-    wanted: Wanted
-) {
+    wanted: Wanted,
+    errors: Errors
+    ) {
     install(WebSockets) {
         pingPeriod = Duration.ofSeconds(15)
         timeout = Duration.ofSeconds(15)
@@ -46,6 +44,10 @@ fun Application.configureSockets(
         sendEvent(WantedEvent.from(value))
     })
 
+    errors.addListener(fun(e: Exception) {
+        sendEvent(ErrorEvent.from(e))
+    })
+
     routing {
         webSocket("/ws") { // websocketSession
             log.info("New connection.")
@@ -60,7 +62,7 @@ fun Application.configureSockets(
 }
 
 enum class WebSocketEventType {
-    TEMPERATURE, WANTED
+    TEMPERATURE, WANTED, ERROR
 }
 
 abstract class WebSocketEvent(val type: WebSocketEventType) {
@@ -69,20 +71,30 @@ abstract class WebSocketEvent(val type: WebSocketEventType) {
     }
 }
 
-class TemperatureEvent(val value: String, val timestamp: String) : WebSocketEvent(WebSocketEventType.TEMPERATURE) {
+class TemperatureEvent(private val value: String, val timestamp: String) : WebSocketEvent(WebSocketEventType.TEMPERATURE) {
     companion object {
         private val df = DecimalFormat("#.#")
         fun from(value: Temperature): TemperatureEvent = TemperatureEvent(
             df.format(value.value),
-            value.timestamp.withZoneSameInstant(ZoneId.of("UTC")).toLocalTime().withNano(0).toString())
+            value.timestamp.withZoneSameInstant(ZoneId.of("UTC")).toLocalTime().withNano(0).toString()
+        )
     }
 
     override fun toString() = this.javaClass.simpleName + "[" + value + "]"
 }
 
-class WantedEvent(val value: Int) : WebSocketEvent(WebSocketEventType.WANTED) {
+class WantedEvent(private val value: Int) : WebSocketEvent(WebSocketEventType.WANTED) {
     companion object {
         fun from(value: WantedValue): WantedEvent = WantedEvent(value.value)
+    }
+
+    override fun toString() = this.javaClass.simpleName + "[" + value + "]"
+}
+
+
+class ErrorEvent(private val value: String) : WebSocketEvent(WebSocketEventType.ERROR) {
+    companion object {
+        fun from(value: Exception): ErrorEvent = ErrorEvent(value.toString())
     }
 
     override fun toString() = this.javaClass.simpleName + "[" + value + "]"
