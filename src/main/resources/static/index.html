@@ -21,6 +21,9 @@
     #lastUpdated {
       color: lightgray;
     }
+    #onOff {
+      color: lightgray;
+    }
   </style>
 </head>
 <body>
@@ -31,6 +34,8 @@
   <button onclick="wanted('down')">-</button>
   <br/>
   <span id="lastUpdated"></span>
+  <br>
+  <span id="onOff"></span>
 </div>
 </body>
 </html>
@@ -58,13 +63,15 @@
     const json = eventObject.data;
     const event = JSON.parse(json);
     if (event.type === "WANTED") {
-      console.log("Wanted: " + json);
       document.getElementById("wanted").innerText = event.value;
 
     } else if (event.type === "TEMPERATURE") {
-      console.log("Temp: " + json);
       document.getElementById("temperature").innerText = event.value;
       document.getElementById("lastUpdated").innerText = event.timestamp;
+
+    } else if (event.type === "ON_OFF") {
+      document.getElementById("onOff").innerText = event.value;
+
     } else {
       console.log(`Unknown event type in event: ${json}`);
     }

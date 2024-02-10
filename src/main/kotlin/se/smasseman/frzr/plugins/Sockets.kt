@@ -1,6 +1,9 @@
 package se.smasseman.frzr.plugins
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.pi4j.io.gpio.digital.DigitalOutput
+import com.pi4j.io.gpio.digital.DigitalState
+import com.pi4j.io.gpio.digital.DigitalStateChangeListener
 import io.ktor.server.application.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
@@ -17,8 +20,9 @@ import java.util.*
 fun Application.configureSockets(
     thermometer: Thermometer,
     wanted: Wanted,
+    output: DigitalOutput,
     errors: Errors
-    ) {
+) {
     install(WebSockets) {
         pingPeriod = Duration.ofSeconds(15)
         timeout = Duration.ofSeconds(15)
@@ -31,7 +35,7 @@ fun Application.configureSockets(
     val connections = Collections.synchronizedSet<DefaultWebSocketSession?>(LinkedHashSet())
     val sendEvent = fun(event: WebSocketEvent) {
         connections.forEach {
-            LoggerFactory.getLogger(this::class.java).info("Send $event")
+            log.debug("Send $event")
             async(context = ctx) { it.send(event.toJson()) }
         }
     }
@@ -44,6 +48,10 @@ fun Application.configureSockets(
         sendEvent(WantedEvent.from(value))
     })
 
+    output.addListener(DigitalStateChangeListener {
+        sendEvent(OnOffState.from(it.state()))
+    })
+
     errors.addListener(fun(e: Exception) {
         sendEvent(ErrorEvent.from(e))
     })
@@ -53,6 +61,7 @@ fun Application.configureSockets(
             log.info("New connection.")
             connections.add(this)
             sendEvent(WantedEvent.from(wanted.get()))
+            sendEvent(OnOffState.from(output.state()))
             this.closeReason.await().run {
                 log.info("Closed connection")
                 connections.remove(this@webSocket)
@@ -62,7 +71,7 @@ fun Application.configureSockets(
 }
 
 enum class WebSocketEventType {
-    TEMPERATURE, WANTED, ERROR
+    TEMPERATURE, WANTED, ERROR, ON_OFF
 }
 
 abstract class WebSocketEvent(val type: WebSocketEventType) {
@@ -71,7 +80,7 @@ abstract class WebSocketEvent(val type: WebSocketEventType) {
     }
 }
 
-class TemperatureEvent(private val value: String, val timestamp: String) : WebSocketEvent(WebSocketEventType.TEMPERATURE) {
+class TemperatureEvent(val value: String, val timestamp: String) : WebSocketEvent(WebSocketEventType.TEMPERATURE) {
     companion object {
         private val df = DecimalFormat("#.#")
         fun from(value: Temperature): TemperatureEvent = TemperatureEvent(
@@ -83,7 +92,7 @@ class TemperatureEvent(private val value: String, val timestamp: String) : WebSo
     override fun toString() = this.javaClass.simpleName + "[" + value + "]"
 }
 
-class WantedEvent(private val value: Int) : WebSocketEvent(WebSocketEventType.WANTED) {
+class WantedEvent(val value: Int) : WebSocketEvent(WebSocketEventType.WANTED) {
     companion object {
         fun from(value: WantedValue): WantedEvent = WantedEvent(value.value)
     }
@@ -91,8 +100,15 @@ class WantedEvent(private val value: Int) : WebSocketEvent(WebSocketEventType.WA
     override fun toString() = this.javaClass.simpleName + "[" + value + "]"
 }
 
+class OnOffState(val value: String) : WebSocketEvent(WebSocketEventType.ON_OFF) {
+    companion object {
+        fun from(value: DigitalState) = OnOffState(if (value.isHigh) "OFF" else "ON")
+    }
 
-class ErrorEvent(private val value: String) : WebSocketEvent(WebSocketEventType.ERROR) {
+    override fun toString() = this.javaClass.simpleName + "[" + value + "]"
+}
+
+class ErrorEvent(val value: String) : WebSocketEvent(WebSocketEventType.ERROR) {
     companion object {
         fun from(value: Exception): ErrorEvent = ErrorEvent(value.toString())
     }
