@@ -1,12 +1,6 @@
 package se.smasseman.frzr
 
-import org.slf4j.LoggerFactory
-import java.io.BufferedReader
-import java.io.File
-import java.io.FileFilter
-import java.io.FileReader
-import java.io.IOException
-import java.lang.Exception
+import java.io.*
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.ZonedDateTime
@@ -33,9 +27,9 @@ class DS1820Reader(private val file: File, private val errors: Errors) : Tempera
 
     override fun read(): Temperature? {
         return try {
-            val value: BigDecimal = readFile();
+            val value: BigDecimal = readFile()
             Temperature(value.toDouble(), ZonedDateTime.now())
-        } catch (e: IOException) {
+        } catch (e: Exception) {
             errors.error(e)
             null
         }

@@ -4,6 +4,7 @@ import com.pi4j.Pi4J
 import com.pi4j.context.Context
 import com.pi4j.io.gpio.digital.DigitalOutput
 import com.pi4j.io.gpio.digital.DigitalState
+import com.pi4j.io.gpio.digital.DigitalStateChangeListener
 import com.pi4j.plugin.mock.platform.MockPlatform
 import com.pi4j.plugin.mock.provider.gpio.digital.MockDigitalInputProvider
 import com.pi4j.plugin.mock.provider.gpio.digital.MockDigitalOutputProvider
@@ -11,7 +12,10 @@ import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import org.slf4j.LoggerFactory
-import se.smasseman.frzr.plugins.*
+import se.smasseman.frzr.plugins.configureRouting
+import se.smasseman.frzr.plugins.configureSockets
+import java.text.DecimalFormat
+import java.time.ZoneId
 
 object Configuration {
     val errors = Errors()
@@ -43,7 +47,7 @@ object Configuration {
         else
             Pi4J.newAutoContext()
 
-        val pinNumber = (System.getProperty("pin", "20")).toString().toInt();
+        val pinNumber = (System.getProperty("pin", "20")).toString().toInt()
         LoggerFactory.getLogger(Configuration.javaClass).info("Pin number is $pinNumber")
 
         val config = DigitalOutput.newConfigBuilder(pi4j)
@@ -54,19 +58,54 @@ object Configuration {
             .initial(DigitalState.HIGH)
             .provider(outputProviderName)
 
-        return pi4j.create(config);
+        return pi4j.create(config)
     }
 }
 
 fun isOsX() = System.getProperties()["os.name"] == "Mac OS X"
 
 fun main() {
-    embeddedServer(Netty, port = 8080, host = "0.0.0.0", module = Application::module)
+    embeddedServer(
+        Netty,
+        port = System.getProperty("port", "8080").toString().toInt(),
+        host = "0.0.0.0",
+        module = Application::module
+    )
         .start(wait = true)
 }
 
 fun Application.module() {
-    configureSerialization()
-    configureSockets(Configuration.thermometer, Configuration.wanted, Configuration.output, Configuration.errors)
+    configureSockets({
+        Configuration.thermometer.addListener { send(temperatureEvent(it)) }
+        Configuration.wanted.addListener { send(wantedEvent(it)) }
+        Configuration.errors.addListener { send(errorEvent(it)) }
+        Configuration.output.addListener(DigitalStateChangeListener {
+            send(onOffEvent(it.state()))
+        })
+    }) {
+        send(wantedEvent(Configuration.wanted.get()))
+        send(onOffEvent(Configuration.output.state()))
+    }
     configureRouting(Configuration.wanted)
 }
+
+private fun temperatureEvent(value: Temperature): Array<Pair<String, Any>> = arrayOf(
+    "type" to "TEMPERATURE",
+    "value" to DecimalFormat("#.#").format(value.value),
+    "timestamp" to value.timestamp.withZoneSameInstant(ZoneId.of("Europe/Stockholm")).toLocalTime().withNano(0).toString()
+)
+
+private fun errorEvent(e: Exception): Array<Pair<String, Any>> = arrayOf(
+    "type" to "ERROR",
+    "value" to e.toString()
+)
+
+fun wantedEvent(value: WantedValue): Array<Pair<String, Any>> = arrayOf(
+    "type" to "WANTED",
+    "value" to value.value
+)
+
+fun onOffEvent(state: DigitalState): Array<Pair<String, Any>> = arrayOf(
+    "type" to "ON_OFF",
+    "value" to if (state.isHigh) "OFF" else "ON"
+)

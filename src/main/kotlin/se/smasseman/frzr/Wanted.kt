@@ -1,12 +1,6 @@
 package se.smasseman.frzr
 
-import java.util.*
-
-class Wanted(private var wantedValue: WantedValue) {
-
-    private val listeners = LinkedList<WantedListener>()
-
-    fun addListener(listener: WantedListener) = listeners.add(listener)
+class Wanted(private var wantedValue: WantedValue) : ListenerManager<WantedValue>() {
 
     fun get() = wantedValue
 
@@ -17,13 +11,9 @@ class Wanted(private var wantedValue: WantedValue) {
     private fun change(i: Int): WantedValue {
         val newValue = WantedValue(wantedValue.value + i)
         wantedValue = newValue
-        listeners.forEach { listener -> listener.updated(newValue) }
+        notifyListeners(newValue)
         return newValue
     }
-}
-
-fun interface WantedListener {
-    fun updated(temperature: WantedValue)
 }
 
 data class WantedValue(val value: Int)
