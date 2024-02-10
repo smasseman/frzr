@@ -1,0 +1,73 @@
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Frzr</title>
+  <style>
+    body, html {
+      font-size: 32px;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      text-align: center;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 18px;
+      width: 100px;
+      height: 50px;
+    }
+    #lastUpdated {
+      color: lightgray;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1><span id="temperature"></span>°C</h1>
+  <button onclick="wanted('up')">+</button>
+  <span id="wanted"></span>
+  <button onclick="wanted('down')">-</button>
+  <br/>
+  <span id="lastUpdated"></span>
+</div>
+</body>
+</html>
+
+<script>
+  function wanted(value) {
+    let xhr = new XMLHttpRequest();
+    xhr.open('POST', '/wanted/' + value);
+    xhr.send();
+    xhr.onload = function () {
+      if (xhr.status !== 200) { // analyze HTTP status of the response
+        alert(`Error ${xhr.status}: ${xhr.statusText}`); // e.g. 404: Not Found
+      } else { // show the result
+        console.log(xhr.response);
+      }
+    };
+    xhr.onerror = function () {
+      alert("Request failed");
+    };
+
+  }
+
+  webSocket = new WebSocket(`ws://${location.host}/ws`);
+  webSocket.onmessage = (eventObject) => {
+    const json = eventObject.data;
+    const event = JSON.parse(json);
+    if (event.type === "WANTED") {
+      console.log("Wanted: " + json);
+      document.getElementById("wanted").innerText = event.value;
+
+    } else if (event.type === "TEMPERATURE") {
+      console.log("Temp: " + json);
+      document.getElementById("temperature").innerText = event.value;
+      document.getElementById("lastUpdated").innerText = event.timestamp;
+    } else {
+      console.log(`Unknown event type in event: ${json}`);
+    }
+  };
+
+</script>
