@@ -10,22 +10,22 @@ class WantedStorage {
 
         private val logger: Logger = LoggerFactory.getLogger(WantedStorage::class.java)
         private val file = File("wanted.txt").absoluteFile
-        private val defaultValue = WantedValue(10)
+        private val defaultValue = Temperature(10.0)
 
         init {
             logger.info("Wanted temperature will be stored in $file")
         }
 
-        fun getInitialWantedValue(): WantedValue {
+        fun getInitialWantedValue(): Temperature {
             return try {
-                WantedValue(Files.readString(file.toPath()).trim().toInt())
+                Temperature(Files.readString(file.toPath()).trim().toDouble())
             } catch (e: Exception) {
                 logger.error("Failed to read wanted value", e)
                 defaultValue
             }
         }
 
-        fun setInitialWantedValue(value: WantedValue) {
+        fun setInitialWantedValue(value: Temperature) {
             try {
                 Files.writeString(file.toPath(), value.value.toString())
             } catch (e: Exception) {

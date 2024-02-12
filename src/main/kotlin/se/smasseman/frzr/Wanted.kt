@@ -1,6 +1,6 @@
 package se.smasseman.frzr
 
-class Wanted(private var wantedValue: WantedValue) : ListenerManager<WantedValue>() {
+class Wanted(private var wantedValue: Temperature) : ListenerManager<Temperature>() {
 
     fun get() = wantedValue
 
@@ -8,13 +8,11 @@ class Wanted(private var wantedValue: WantedValue) : ListenerManager<WantedValue
 
     fun dec() = change(-1)
 
-    private fun change(i: Int): WantedValue {
-        val newValue = WantedValue(wantedValue.value + i)
+    private fun change(i: Int): Temperature {
+        val newValue = Temperature(wantedValue.value + i)
         wantedValue = newValue
         notifyListeners(newValue)
         return newValue
     }
 }
-
-data class WantedValue(val value: Int)
 

@@ -25,10 +25,10 @@ class DS1820Reader(private val file: File, private val errors: Errors) : Tempera
         }
     }
 
-    override fun read(): Temperature? {
+    override fun read(): TemperatureReading? {
         return try {
             val value: BigDecimal = readFile()
-            Temperature(value.toDouble(), ZonedDateTime.now())
+            TemperatureReading(Temperature(value.toDouble()), ZonedDateTime.now())
         } catch (e: Exception) {
             errors.error(e)
             null

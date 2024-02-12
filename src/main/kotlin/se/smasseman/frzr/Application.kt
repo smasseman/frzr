@@ -12,10 +12,12 @@ import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import org.slf4j.LoggerFactory
+import se.smasseman.frzr.Errors.Failure
 import se.smasseman.frzr.plugins.configureRouting
 import se.smasseman.frzr.plugins.configureSockets
 import java.text.DecimalFormat
 import java.time.ZoneId
+import java.time.ZonedDateTime
 
 object Configuration {
     val errors = Errors()
@@ -25,13 +27,25 @@ object Configuration {
             SimulatedReader(wanted)
         } else {
             DS1820Reader.create(errors)
-        }
+        },
+        errors
     )
     val output = createOutput()
 
     init {
         Brain(thermometer, wanted, output)
         wanted.addListener { WantedStorage.setInitialWantedValue(it) }
+        simulateErrors()
+    }
+
+    private fun simulateErrors() {
+        //        Thread {
+//            var count = 0;
+//            while (count < 1000) {
+//                Thread.sleep(1000)
+//                errors.error(NullPointerException("Fel nr " + (count++)))
+//            }
+//        }.start()
     }
 
     private fun createOutput(): DigitalOutput {
@@ -65,13 +79,19 @@ object Configuration {
 fun isOsX() = System.getProperties()["os.name"] == "Mac OS X"
 
 fun main() {
-    embeddedServer(
-        Netty,
-        port = System.getProperty("port", "8080").toString().toInt(),
-        host = "0.0.0.0",
-        module = Application::module
-    )
-        .start(wait = true)
+    try {
+        embeddedServer(
+            Netty,
+            port = System.getProperty("port", "8080").toString().toInt(),
+            host = "0.0.0.0",
+            module = Application::module,
+        )
+            .start(wait = true)
+            .addShutdownHook { Configuration.thermometer.terminate() }
+    } catch (e: Exception) {
+        LoggerFactory.getLogger("MAIN").error("Faield to start", e)
+        Configuration.thermometer.terminate();
+    }
 }
 
 fun Application.module() {
@@ -86,21 +106,29 @@ fun Application.module() {
         send(wantedEvent(Configuration.wanted.get()))
         send(onOffEvent(Configuration.output.state()))
     }
-    configureRouting(Configuration.wanted)
+    configureRouting(Configuration.wanted, Configuration.errors)
 }
 
-private fun temperatureEvent(value: Temperature): Array<Pair<String, Any>> = arrayOf(
+private fun temperatureEvent(value: TemperatureReading): Array<Pair<String, Any>> = arrayOf(
     "type" to "TEMPERATURE",
-    "value" to DecimalFormat("#.#").format(value.value),
-    "timestamp" to value.timestamp.withZoneSameInstant(ZoneId.of("Europe/Stockholm")).toLocalTime().withNano(0).toString()
+    "value" to DecimalFormat("#.#").format(value.value.value),
+    "timestamp" to timeToString(value.timestamp)
 )
 
-private fun errorEvent(e: Exception): Array<Pair<String, Any>> = arrayOf(
+private fun timeToString(value: ZonedDateTime) =
+    value.withZoneSameInstant(ZoneId.of("Europe/Stockholm")).toLocalTime().withNano(0).toString()
+
+private fun timeAndDateToString(value: ZonedDateTime) =
+    value.withZoneSameInstant(ZoneId.of("Europe/Stockholm")).run {
+        toLocalDate().toString() + " " + toLocalTime().withNano(0).toString()
+    }
+
+private fun errorEvent(list: List<Failure>): Array<Pair<String, Any>> = arrayOf(
     "type" to "ERROR",
-    "value" to e.toString()
+    "errors" to list.associate { timeAndDateToString(it.timestamp) to it.exception.toString() }
 )
 
-fun wantedEvent(value: WantedValue): Array<Pair<String, Any>> = arrayOf(
+fun wantedEvent(value: Temperature): Array<Pair<String, Any>> = arrayOf(
     "type" to "WANTED",
     "value" to value.value
 )

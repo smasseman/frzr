@@ -12,15 +12,21 @@
       text-align: center;
     }
 
+    #errors {
+      font-size: 16px;
+    }
+
     button {
       padding: 10px 20px;
       font-size: 18px;
       width: 100px;
       height: 50px;
     }
+
     #lastUpdated {
       color: lightgray;
     }
+
     #onOff {
       color: lightgray;
     }
@@ -36,14 +42,37 @@
   <span id="lastUpdated"></span>
   <br>
   <span id="onOff"></span>
+  <div id="errorsclearing" style="display: none;">
+    <button style="width: 200px" onclick="clearErrors()">Clear errors</button>
+  </div>
+  <div id="errors"></div>
 </div>
 </body>
 </html>
 
 <script>
+  let errorCount = 0;
+
   function wanted(value) {
     let xhr = new XMLHttpRequest();
     xhr.open('POST', '/wanted/' + value);
+    xhr.send();
+    xhr.onload = function () {
+      if (xhr.status !== 200) { // analyze HTTP status of the response
+        alert(`Error ${xhr.status}: ${xhr.statusText}`); // e.g. 404: Not Found
+      } else { // show the result
+        console.log(xhr.response);
+      }
+    };
+    xhr.onerror = function () {
+      alert("Request failed");
+    };
+
+  }
+
+  function clearErrors() {
+    let xhr = new XMLHttpRequest();
+    xhr.open('POST', '/clearerrors');
     xhr.send();
     xhr.onload = function () {
       if (xhr.status !== 200) { // analyze HTTP status of the response
@@ -71,6 +100,21 @@
 
     } else if (event.type === "ON_OFF") {
       document.getElementById("onOff").innerText = event.value;
+
+    } else if (event.type === "ERROR") {
+      console.log("Error: " + json);
+      //alert(event.value);
+      let s = "";
+      for (const date in event.errors) {
+        s += `${date} | ${event.errors[date]}<br>`;
+      }
+      document.getElementById("errors").innerHTML = s;
+      const div = document.getElementById("errorsclearing");
+      if (Object.keys(event.errors).length === 0) {
+        div.style.display = "none";
+      } else {
+        div.style.display = "block";
+      }
 
     } else {
       console.log(`Unknown event type in event: ${json}`);

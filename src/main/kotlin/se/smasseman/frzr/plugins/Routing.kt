@@ -1,14 +1,13 @@
 package se.smasseman.frzr.plugins
 
 import io.ktor.server.application.*
-import io.ktor.server.http.content.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import org.slf4j.LoggerFactory
+import se.smasseman.frzr.Errors
 import se.smasseman.frzr.Wanted
 import java.io.File
 
-fun Application.configureRouting(wanted: Wanted) {
+fun Application.configureRouting(wanted: Wanted, errors: Errors) {
     routing {
         get("/") {
             call.respondRedirect("static/index.html")
@@ -24,6 +23,11 @@ fun Application.configureRouting(wanted: Wanted) {
                 ),
                 call.parameters["file"].toString()
             )
+        }
+
+        post("/clearerrors") {
+            errors.clear()
+            call.respond("Cleared")
         }
 
         post("/wanted/up") {
