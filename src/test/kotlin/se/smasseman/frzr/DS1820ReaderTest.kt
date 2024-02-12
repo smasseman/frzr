@@ -19,7 +19,7 @@ class DS1820ReaderTest {
             a1 01 4b 01 7f ff 0c 10 34 t=26062
         """.trimIndent().toByteArray()
         )
-        val reader = DS1820Reader.create(Errors.systemOut(), rootDir)
+        val reader = DS1820Reader.create(rootDir)
         val t = reader.read()
         assertThat(t).isNotNull
         assertThat(t!!.value).isEqualTo(26.1)

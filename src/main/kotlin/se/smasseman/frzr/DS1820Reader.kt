@@ -6,10 +6,10 @@ import java.math.RoundingMode
 import java.time.ZonedDateTime
 import java.util.regex.Pattern
 
-class DS1820Reader(private val file: File, private val errors: Errors) : TemperatureReader {
+class DS1820Reader(private val file: File) : TemperatureReader {
 
     companion object {
-        fun create(errors: Errors, directory: File = File("/sys/bus/w1/devices")): DS1820Reader {
+        fun create(directory: File = File("/sys/bus/w1/devices")): DS1820Reader {
             val dirs: Array<out File> = directory
                 .listFiles(FileFilter { it.isDirectory })
                 ?: throw Exception("Could not list directories in $directory")
@@ -20,8 +20,7 @@ class DS1820Reader(private val file: File, private val errors: Errors) : Tempera
             if (dirs.size > 1) {
                 throw Exception("More then 1 directory found in $directory. Found ${dirs.size} directories. $dirs")
             }
-            val file = File(dirs.first(), "w1_slave")
-            return DS1820Reader(file, errors)
+            return DS1820Reader(File(dirs.first(), "w1_slave"))
         }
     }
 
@@ -30,7 +29,7 @@ class DS1820Reader(private val file: File, private val errors: Errors) : Tempera
             val value: BigDecimal = readFile()
             TemperatureReading(Temperature(value.toDouble()), ZonedDateTime.now())
         } catch (e: Exception) {
-            errors.error(e)
+            Errors.error(e)
             null
         }
     }

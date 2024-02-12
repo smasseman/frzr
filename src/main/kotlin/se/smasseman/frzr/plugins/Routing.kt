@@ -7,7 +7,7 @@ import se.smasseman.frzr.Errors
 import se.smasseman.frzr.Wanted
 import java.io.File
 
-fun Application.configureRouting(wanted: Wanted, errors: Errors) {
+fun Application.configureRouting(wanted: Wanted) {
     routing {
         get("/") {
             call.respondRedirect("static/index.html")
@@ -26,7 +26,7 @@ fun Application.configureRouting(wanted: Wanted, errors: Errors) {
         }
 
         post("/clearerrors") {
-            errors.clear()
+            Errors.clear()
             call.respond("Cleared")
         }
 

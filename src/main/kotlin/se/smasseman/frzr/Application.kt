@@ -18,17 +18,16 @@ import se.smasseman.frzr.plugins.configureSockets
 import java.text.DecimalFormat
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import java.util.stream.IntStream
 
 object Configuration {
-    val errors = Errors()
     val wanted = Wanted(WantedStorage.getInitialWantedValue())
     val thermometer = Thermometer(
         if (isOsX()) {
             SimulatedReader(wanted)
         } else {
-            DS1820Reader.create(errors)
-        },
-        errors
+            DS1820Reader.create()
+        }
     )
     val output = createOutput()
 
@@ -39,13 +38,14 @@ object Configuration {
     }
 
     private fun simulateErrors() {
-        //        Thread {
-//            var count = 0;
-//            while (count < 1000) {
-//                Thread.sleep(1000)
-//                errors.error(NullPointerException("Fel nr " + (count++)))
-//            }
-//        }.start()
+        if (false) {
+            Thread {
+                IntStream.range(0, 100).forEach {
+                    Thread.sleep(1000)
+                    Errors.error(NullPointerException("Fel nr $it"))
+                }
+            }.start()
+        }
     }
 
     private fun createOutput(): DigitalOutput {
@@ -98,7 +98,7 @@ fun Application.module() {
     configureSockets({
         Configuration.thermometer.addListener { send(temperatureEvent(it)) }
         Configuration.wanted.addListener { send(wantedEvent(it)) }
-        Configuration.errors.addListener { send(errorEvent(it)) }
+        Errors.addListener { send(errorEvent(it)) }
         Configuration.output.addListener(DigitalStateChangeListener {
             send(onOffEvent(it.state()))
         })
@@ -106,7 +106,7 @@ fun Application.module() {
         send(wantedEvent(Configuration.wanted.get()))
         send(onOffEvent(Configuration.output.state()))
     }
-    configureRouting(Configuration.wanted, Configuration.errors)
+    configureRouting(Configuration.wanted)
 }
 
 private fun temperatureEvent(value: TemperatureReading): Array<Pair<String, Any>> = arrayOf(
